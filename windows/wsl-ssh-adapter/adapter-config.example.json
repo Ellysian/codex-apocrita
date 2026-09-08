@@ -1,0 +1,16 @@
+{
+  "Distribution": "Ubuntu",
+  "User": "researcher",
+  "LinuxHome": "/home/researcher",
+  "TargetAlias": "apocrita-codex",
+  "TargetHost": "login.example.invalid",
+  "TargetUser": "hpcuser",
+  "TargetPort": 22,
+  "LinuxSsh": "/usr/bin/ssh",
+  "LinuxConfig": "/home/researcher/.ssh/config",
+  "ControlPath": "/home/researcher/.ssh/ca-%C",
+  "WindowsConfigPath": "C:\\Users\\Example\\.ssh\\config",
+  "WindowsIdentityPath": null,
+  "WindowsSsh": "C:\\Windows\\System32\\OpenSSH\\ssh.exe",
+  "MetadataLogging": false
+}

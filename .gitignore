@@ -4,3 +4,19 @@ outputs/
 *.tmp
 *.tar.gz
 test-results/
+
+# Windows adapter build output and local, user-specific configuration/state.
+windows/wsl-ssh-adapter/bin/
+windows/wsl-ssh-adapter/tests/bin/
+windows/wsl-ssh-adapter/tests/work/
+windows/wsl-ssh-adapter/tests/.test-tmp/
+windows/wsl-ssh-adapter/tests/codex-adapter-profile-test-*/
+windows/wsl-ssh-adapter/logs/
+windows/wsl-ssh-adapter/state/
+windows/wsl-ssh-adapter/backups/
+windows/wsl-ssh-adapter/adapter-config.json
+*.exe
+*.dll
+*.pdb
+*.lnk
+__pycache__/

@@ -12,7 +12,9 @@ Run [Codex Desktop](https://learn.chatgpt.com/docs/remote-connections#connect-to
 - Permission to submit jobs to Apocrita's `compute` partition.
 - A ChatGPT/Codex account you can authenticate on the remote host.
 
-Windows users should read [Experimental Windows/WSL support](docs/windows-wsl.md) first.
+Windows users can build the optional [experimental Windows/WSL adapter](docs/windows-wsl.md)
+to reuse an already authenticated WSL SSH master. This has a separate Windows
+installation and local test workflow; the main shell installer still runs in WSL.
 
 ## Install
 

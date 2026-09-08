@@ -1,0 +1,8 @@
+# Preserve shell scripts when checked out on Windows and executed in WSL.
+* text=auto eol=lf
+*.sh text eol=lf
+remote/* text eol=lf
+bin/* text eol=lf
+*.py text eol=lf
+*.ps1 text eol=lf
+*.cs text eol=lf

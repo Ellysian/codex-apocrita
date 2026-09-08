@@ -1,0 +1,32 @@
+name: Windows adapter
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  local-fixtures:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: windows/wsl-ssh-adapter
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and test parser, configuration, and byte transport
+        shell: pwsh
+        run: ./tests/Run-CoreTests.ps1
+      - name: Test pure lease decisions on PowerShell 7
+        shell: pwsh
+        run: ./tests/Test-DesktopProfileGuard.ps1
+      - name: Test Desktop activation identity decisions without starting Desktop
+        shell: pwsh
+        run: ./tests/Test-DesktopActivationGuard.ps1
+      - name: Test pure lease decisions on Windows PowerShell 5.1
+        shell: powershell
+        run: ./tests/Test-DesktopProfileGuard.ps1
+      - name: Test installation and removal on temporary profiles only
+        shell: pwsh
+        run: ./tests/Test-DesktopProfileLifecycle.ps1
