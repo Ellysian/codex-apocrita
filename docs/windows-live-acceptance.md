@@ -1,5 +1,10 @@
 # Windows acceptance record, updated 2026-09-08
 
+This dated record describes the revision and installation below. The later
+[Store-update recovery follow-up](windows-store-update-recovery.md) has separate
+local regression coverage and a narrower live observation; it does not replace
+this record with a new clean-install or rollback claim.
+
 Status: local regression checks, a fresh-build SSH check, actual adapter
 installation, upstream runtime activation, corrected Desktop launch, and Desktop
 SSH connection passed. Two concurrent documentation turns completed with real
