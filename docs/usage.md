@@ -17,6 +17,8 @@ apo off                 # allocation and SSH master
 
 Only one Codex allocation is recorded per remote account. `switch` is explicit because it cancels the current job.
 
+For a proposed way to give projects separate allocation lifecycles, see [Independent project controllers](independent-controllers-proposal.md). This is a design discussion, not an available command or installer option; it proposes explicit per-instance stop without automatic idle shutdown.
+
 ## Profiles
 
 ```bash
