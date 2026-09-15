@@ -29,17 +29,20 @@ param([switch]$DefinitionsOnly)
             if ($expires -le $requested -or ($expires-$requested).TotalSeconds -gt 60 -or $NowUtc -lt $requested.AddSeconds(-1) -or $NowUtc -ge $expires) { return Result 'EXPIRED_OR_INVALID_WINDOW' }
             if ($parentStart -lt $requested.AddSeconds(-1) -or $parentStart -gt $NowUtc.AddSeconds(1) -or ($NowUtc-$parentStart).TotalSeconds -gt 60) { return Result 'PARENT_START_OUTSIDE_WINDOW' }
             if ([int64]$Observed.ParentProcessId -le 0 -or [int64]$Observed.ShellProcessId -le 0 -or $Observed.ParentProcessId -eq $Observed.ShellProcessId) { return Result 'INVALID_PROCESS_ID' }
-            $expectedExe=FullPath $Lease.expectedDesktopExecutable; $actualExe=FullPath $Observed.ParentExecutable
-            $package=[string]$Lease.expectedPackageFullName
-            if ($package -cnotmatch '^OpenAI\.Codex_\d+\.\d+\.\d+\.\d+_x64__2p2nqsd0c76g0$' -or [IO.Path]::GetFileName($expectedExe) -ine 'ChatGPT.exe' -or [IO.Path]::GetFileName([IO.Path]::GetDirectoryName($expectedExe)) -ine 'app' -or [IO.Path]::GetFileName([IO.Path]::GetDirectoryName([IO.Path]::GetDirectoryName($expectedExe))) -ine $package -or $Observed.ParentPackageFullName -cne $package) { return Result 'WRONG_DESKTOP_PACKAGE' }
-            if ($actualExe -ine $expectedExe) { return Result 'WRONG_DIRECT_PARENT_EXE' }
             if ((FullPath $Lease.adapterBin) -ine (FullPath $AllowedAdapterBin)) { return Result 'WRONG_ADAPTER_PATH' }
             if (-not (SameHash $Lease.adapterSha256 $Observed.AdapterSha256)) { return Result 'ADAPTER_HASH_MISMATCH' }
             if (-not (SameHash $Lease.configSha256 $Observed.ConfigSha256)) { return Result 'CONFIG_HASH_MISMATCH' }
             if ($Lease.state -ceq 'PENDING') {
                 if ([int64]$Lease.registeredProcessId -ne 0 -or -not [string]::IsNullOrWhiteSpace([string]$Lease.registeredProcessStartUtc)) { return Result 'PENDING_WITH_REGISTRATION' }
+                # The Store may replace the preflight package during activation.
+                # Wait within the existing bound; no environment is granted until
+                # the launcher publishes and we verify its effective identity.
                 return Result 'WAITING_FOR_REGISTRATION' 'WAIT'
             }
+            $expectedExe=FullPath $Lease.expectedDesktopExecutable; $actualExe=FullPath $Observed.ParentExecutable
+            $package=[string]$Lease.expectedPackageFullName
+            if ($package -cnotmatch '^OpenAI\.Codex_\d+\.\d+\.\d+\.\d+_x64__2p2nqsd0c76g0$' -or [IO.Path]::GetFileName($expectedExe) -ine 'ChatGPT.exe' -or [IO.Path]::GetFileName([IO.Path]::GetDirectoryName($expectedExe)) -ine 'app' -or [IO.Path]::GetFileName([IO.Path]::GetDirectoryName([IO.Path]::GetDirectoryName($expectedExe))) -ine $package -or $Observed.ParentPackageFullName -cne $package) { return Result 'WRONG_DESKTOP_PACKAGE' }
+            if ($actualExe -ine $expectedExe) { return Result 'WRONG_DIRECT_PARENT_EXE' }
             if ([int64]$Lease.registeredProcessId -ne [int64]$Observed.ParentProcessId) { return Result 'REGISTERED_PID_MISMATCH' }
             if ((Utc $Lease.registeredProcessStartUtc).UtcTicks -ne $parentStart.UtcTicks) { return Result 'REGISTERED_START_MISMATCH' }
             return Result 'MATCHED_REGISTERED_DESKTOP' 'APPLY'
@@ -97,7 +100,6 @@ param([switch]$DefinitionsOnly)
             try { $process.StartTime.ToUniversalTime() } finally { $process.Dispose() }
         }
         $lease=Read-Lease; $launchId=[string]$lease.launchId
-        if ([string]$parent.ExecutablePath -ine [string]$lease.expectedDesktopExecutable) { return }
         $owner=Invoke-CimMethod -InputObject $parent -MethodName GetOwnerSid
         if ($owner.ReturnValue -ne 0 -or $owner.Sid -cne $sid) { return }
         if ($null -eq ('Apocrita.ProfileGuard.PackageIdentity' -as [type])) { Add-Type -Path $native }

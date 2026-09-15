@@ -36,6 +36,14 @@ configuration must not receive the adapter PATH. Pure activation tests inspect
 arguments or use mocks; they must not activate the real Store app. Run guard tests
 under Windows PowerShell 5.1 and PowerShell 7 where applicable.
 
+Store-update regression cases distinguish the initial package from a newly
+resolved official registration. Only an exact matching activation may proceed.
+The PENDING profile state waits without granting PATH; REGISTERED must match the
+effective package, executable, PID, start time and original trust/hash checks.
+Launcher flow fixtures exercise those real script statements with synthetic
+activation, registration and filesystem responses, including the order of the
+REGISTERED write and refusal paths. They do not activate the installed application.
+
 The lifecycle fixture uses a copied same-user token with the user SID as the
 default file owner, so it also runs on hosted administrator accounts whose default
 owner is Administrators. This context is limited to the disposable fixture and

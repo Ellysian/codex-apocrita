@@ -3,14 +3,20 @@
 param([switch]$CheckOnly,[switch]$DefinitionsOnly)
 $ErrorActionPreference='Stop'
 if ($CheckOnly -and $DefinitionsOnly) { throw 'Choose either CheckOnly or DefinitionsOnly.' }
-function Get-DesktopActivationStatus($Activation,$Installation,[DateTimeOffset]$RequestedUtc) {
-    if ($null -eq $Activation -or $Activation.HResult -lt 0 -or $Activation.ProcessId -eq 0) { return 'ACTIVATION_FAILED' }
-    if ($Activation.PackageQueryError -ne 0 -or [string]::IsNullOrEmpty($Activation.PackageFullName)) { return 'PACKAGE_IDENTITY_UNAVAILABLE' }
+function Get-DesktopActivationStatus($Activation,$Installation,[DateTimeOffset]$RequestedUtc,[DateTimeOffset]$NowUtc) {
+    if ($null -eq $Activation -or $null -eq $Activation.HResult -or $Activation.HResult -lt 0 -or
+        $null -eq $Activation.ProcessId -or $Activation.ProcessId -le 0 -or $Activation.ProcessId -gt [int]::MaxValue) { return 'ACTIVATION_FAILED' }
+    if ($null -eq $Activation.PackageQueryError -or $Activation.PackageQueryError -ne 0 -or [string]::IsNullOrEmpty($Activation.PackageFullName)) { return 'PACKAGE_IDENTITY_UNAVAILABLE' }
+    # Installation metadata comes only from Resolve-CodexDesktopInstallation,
+    # which verifies the current user's registered Store package and publisher.
+    if ($null -eq $Installation -or [string]$Installation.packageFullName -cnotmatch '^OpenAI\.Codex_\d+\.\d+\.\d+\.\d+_x64__2p2nqsd0c76g0$') { return 'INVALID_REGISTRATION' }
     if ($Activation.PackageFullName -cne $Installation.packageFullName) { return 'PACKAGE_IDENTITY_MISMATCH' }
     if ($Activation.Executable -ine $Installation.desktopExecutable) { return 'EXECUTABLE_MISMATCH' }
     $started=[DateTimeOffset]::MinValue
-    if (-not [DateTimeOffset]::TryParse($Activation.ProcessStartUtc,[ref]$started)) { return 'PROCESS_START_UNAVAILABLE' }
+    if ([string]$Activation.ProcessStartUtc -notmatch '(Z|\+00:00)$' -or
+        -not [DateTimeOffset]::TryParse($Activation.ProcessStartUtc,[ref]$started) -or $started.Offset -ne [TimeSpan]::Zero) { return 'PROCESS_START_UNAVAILABLE' }
     if ($started -lt $RequestedUtc.AddSeconds(-1)) { return 'PROCESS_NOT_NEW' }
+    if ($NowUtc -lt $RequestedUtc.AddSeconds(-1) -or $NowUtc -ge $RequestedUtc.AddSeconds(60) -or $started -gt $NowUtc.AddSeconds(1)) { return 'PROCESS_OUTSIDE_LAUNCH_WINDOW' }
     return 'MATCHED_NEW_DESKTOP'
 }
 # Pure validation entry point: no package discovery, files, processes or activation.
@@ -42,6 +48,7 @@ if ($null -eq ('Apocrita.PackageActivation.Desktop' -as [type])) { Add-Type -Pat
 $adapterHash=(Get-FileHash -LiteralPath $adapter -Algorithm SHA256).Hash
 $configHash=(Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash
 $installation=Resolve-CodexDesktopInstallation
+$initialInstallation=$installation; $packageUpdatedDuringActivation=$false
 $desktopExe=$installation.desktopExecutable
 $launchId=[guid]::NewGuid().ToString('N'); $requested=[DateTimeOffset]::UtcNow
 $lease=[ordered]@{
@@ -56,11 +63,23 @@ try {
     Assert-DesktopStopped
     Write-DesktopProtectedJson $leasePath $lease
     $activation=[Apocrita.PackageActivation.Desktop]::Activate()
-    $activationStatus=Get-DesktopActivationStatus $activation $installation $requested
-    if ($activationStatus -ceq 'PACKAGE_IDENTITY_MISMATCH') {
-        throw 'Windows activated a different Desktop package. A Store update may have completed during startup. Use the normal Desktop Quit action, then run this launcher again. This window has not been verified for adapter use.'
+    $activationStatus=Get-DesktopActivationStatus $activation $installation $requested ([DateTimeOffset]::UtcNow)
+    if ($activationStatus -cin @('PACKAGE_IDENTITY_MISMATCH','EXECUTABLE_MISMATCH')) {
+        # A Store update may become registered between preflight and activation.
+        # Re-resolve once through the same official registration/manifest checks;
+        # never accept an executable merely because its directory looks newer.
+        $resolvedInstallation=Resolve-CodexDesktopInstallation
+        $activationStatus=Get-DesktopActivationStatus $activation $resolvedInstallation $requested ([DateTimeOffset]::UtcNow)
+        if ($activationStatus -ceq 'MATCHED_NEW_DESKTOP') {
+            $installation=$resolvedInstallation
+            $packageUpdatedDuringActivation=$installation.packageFullName -cne $initialInstallation.packageFullName
+        }
     }
     if ($activationStatus -cne 'MATCHED_NEW_DESKTOP') { throw "Official activation did not return the expected newly started package process ($activationStatus)." }
+    # Publish the effective identity and its PID together, before the waiting
+    # profile can observe REGISTERED. PENDING never authorizes an environment.
+    $desktopExe=$installation.desktopExecutable
+    $lease.expectedDesktopExecutable=$desktopExe; $lease.expectedPackageFullName=$installation.packageFullName
     $lease.registeredProcessId=$activation.ProcessId; $lease.registeredProcessStartUtc=$activation.ProcessStartUtc; $lease.state='REGISTERED'
     Write-DesktopProtectedJson $leasePath $lease
     $deadline=[DateTimeOffset]::UtcNow.AddSeconds(20); $matched=$false
@@ -75,7 +94,8 @@ try {
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     if (-not $matched) { throw 'Desktop opened but its scoped shell environment was not verified. Inspect setup before retrying; the launcher does not terminate it.' }
     $process=Get-Process -Id $activation.ProcessId -ErrorAction Stop
-    if ($process.Path -ine $desktopExe -or $process.HasExited) { throw 'Desktop exited before verification completed.' }
+    if ($process.Path -ine $desktopExe -or $process.HasExited -or
+        $process.StartTime.ToUniversalTime().Ticks -ne [DateTimeOffset]::Parse($activation.ProcessStartUtc).UtcDateTime.Ticks) { throw 'Desktop changed or exited before verification completed.' }
     $launchStatus='DESKTOP_STARTED_PROFILE_APPLIED'
     [pscustomobject]@{status=$launchStatus;packageVersion=$installation.packageVersion;globalPathChanged=$false;remoteTransportVerified=$false}
 } catch {
@@ -91,6 +111,8 @@ try {
         completedUtc=[DateTimeOffset]::UtcNow.ToString('o'); status=$launchStatus
         activationStatus=$activationStatus; expectedPackageFullName=$installation.packageFullName
         expectedDesktopExecutable=$desktopExe
+        initialPackageFullName=$initialInstallation.packageFullName; initialDesktopExecutable=$initialInstallation.desktopExecutable
+        packageUpdatedDuringActivation=$packageUpdatedDuringActivation
         actualPackageFullName=$null; actualDesktopExecutable=$null
         processId=$null; processStartUtc=$null; hResult=$null; packageQueryError=$null
       }

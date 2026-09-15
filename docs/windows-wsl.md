@@ -159,10 +159,14 @@ the desktop is already running, quit it normally; the launcher will not kill it.
 
 The successful launch result is `DESKTOP_STARTED_PROFILE_APPLIED`; an open window
 alone does not confirm that the adapter environment was applied. If a Store
-update changes the registered package during startup, the launcher refuses the
-different identity. Quit Desktop normally and rerun the same launcher after the
-update completes. Reinstallation and new SSH authentication are not required
-solely because of this package mismatch.
+update changes the package during activation, the launcher resolves the official
+registration again and accepts the new process only if its package, executable
+and creation time pass the same identity checks. The profile waits for this
+verified registration before applying the adapter environment. A process that
+does not match the current official registration is still refused. On refusal,
+quit Desktop normally and rerun the launcher after the update completes;
+reinstallation and new SSH authentication are not required solely because of a
+package mismatch.
 
 Launch outcomes are saved locally as `state/desktop-launch-<launch-id>.json`, with
 expected and observed package/process metadata. These files do not contain
@@ -197,10 +201,11 @@ controller or reverse-SSH back to login.
 | Symptom | Next check |
 | --- | --- |
 | `APOCRITA_REAUTH_REQUIRED` | Reauthenticate in the selected WSL distribution/user. |
-| Alias not visible | Check the concrete Windows SSH entry and selected connection. |
+| Alias not visible | Check the concrete Windows SSH entry, refresh discovery, and add/select that connection in Desktop. An SSH config entry alone does not prove Desktop has added it. |
 | Adapter refuses a request | Check validated settings and supported options; do not enable arbitrary proxies or forwarding. |
 | Store executable missing after update | Let the update finish and rerun the launch check. |
-| Desktop opens but the launcher reports a different package | Quit normally and rerun the launcher after the Store update completes; confirm `DESKTOP_STARTED_PROFILE_APPLIED` before testing SSH. |
+| Desktop opens but activation identity is refused | Inspect the launch result. Recovery requires the actual process to match the newly resolved official registration. Quit normally and retry after the Store update completes; do not weaken identity checks. |
+| `No Codex Slurm allocation. Run apo first.` | The request reached the remote dispatcher, but no allocation is recorded. Check `apo status` and login-side scheduler state, then start or reuse a controller through the documented WSL workflow. This message alone does not mean SSH authentication failed. |
 | Direct WindowsApps executable launch denied | Use the package-activation launcher; do not alter WindowsApps permissions. |
 | Build output quarantined | Review security-product events and source/build provenance; use only a narrowly scoped, organization-approved exception if needed. |
 | Connection works but a task fails | Investigate remote task configuration and permissions separately. |
@@ -216,6 +221,11 @@ Removal checks the exact installed suffix and disables its lease. Source, privat
 configuration, and backups remain. It does not cancel Slurm jobs or remove WSL
 authentication. If the suffix has changed, inspect the difference rather than
 overwriting the profile.
+
+Closing Desktop or removing this adapter does not release a Slurm allocation.
+Use the documented [controller stop operation](usage.md#jobs) when the controller
+is no longer needed. This adapter does not stop resources based on chat inactivity;
+legitimate pauses between tasks are not a completion signal.
 
 ## Clean-install, restart, and rollback acceptance
 
