@@ -3,6 +3,7 @@ set -euo pipefail
 
 SOURCE_ROOT=$(cd -P "$(dirname "$0")" && pwd)
 source "$SOURCE_ROOT/lib/common.sh"
+source "$SOURCE_ROOT/lib/ssh-wrapper.sh"
 purge_codex=0
 CA_ASSUME_YES=0
 while [[ $# -gt 0 ]]; do
@@ -49,5 +50,6 @@ fi
 rm -f -- "$HOME/.ssh/codex-apocrita.conf" "$HOME/.local/bin/$CA_COMMAND_NAME" \
   "$HOME/.local/share/zsh/site-functions/_$CA_COMMAND_NAME" \
   "$HOME/.local/share/bash-completion/completions/$CA_COMMAND_NAME"
+ca_remove_ssh_wrapper
 rm -rf -- "$(ca_config_dir)" "$(ca_state_dir)" "$(ca_data_dir)"
 echo 'codex-apocrita was uninstalled. Timestamped configuration backups were preserved.'

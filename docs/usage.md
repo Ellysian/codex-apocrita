@@ -72,6 +72,11 @@ apo rollback
 
 Updates are manual. Installations made from a Git checkout retain its path; `apo update` fast-forwards that checkout and reruns the idempotent installer. Both local and remote integrations retain a `previous` symlink for rollback.
 
+Updates also manage the local SSH compatibility shim for `apocrita-codex`.
+Fully quit and reopen Desktop afterward. Existing unrelated SSH wrappers are
+preserved with a warning; the installer option `--ssh-wrapper off` persists an
+opt-out. See the [installation reference](installation.md) for details.
+
 ## Completion and help
 
 After opening a new terminal, type `apo ` and press Tab. Bash and Zsh ask the installed completion function for candidates based on the words already typed; it suggests commands, relevant subcommands, remote profile names, and supported profile `KEY=` settings. This is local shell behavior and does not submit or execute the unfinished command. Profile-name completion performs only a noninteractive health check and reads names when the authenticated SSH master is already available; it never opens a password prompt. Use `apo --help` or `apo -h` to print the full command reference.

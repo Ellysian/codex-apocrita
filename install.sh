@@ -7,6 +7,7 @@ source "$SOURCE_ROOT/lib/common.sh"
 source "$SOURCE_ROOT/lib/ssh-config.sh"
 source "$SOURCE_ROOT/lib/codex-release.sh"
 source "$SOURCE_ROOT/lib/remote-deploy.sh"
+source "$SOURCE_ROOT/lib/ssh-wrapper.sh"
 
 base_host=apocrita
 base_host_supplied=0
@@ -22,6 +23,8 @@ skip_auth=0
 install_mode=auto
 from_config=''
 preserve_profile=0
+ssh_wrapper=auto
+ssh_wrapper_supplied=0
 CA_ASSUME_YES=0
 
 usage() {
@@ -41,6 +44,7 @@ Default CPU profile:
   --time DURATION            Wall time (4:00:00)
 
 Behavior:
+  --ssh-wrapper auto|off    Manage the local SSH compatibility fix (auto)
   --remote-install-mode auto|remote|upload
   --skip-auth                Do not run remote Codex device login
   --yes, --non-interactive   Accept defaults or supplied flags
@@ -59,6 +63,7 @@ while [[ $# -gt 0 ]]; do
     --partition) partition="$2"; shift ;; --cpus) cpus="$2"; shift ;;
     --memory) memory="$2"; shift ;; --time) walltime="$2"; shift ;;
     --remote-install-mode) install_mode="$2"; shift ;; --skip-auth) skip_auth=1 ;;
+    --ssh-wrapper) ssh_wrapper="$2"; ssh_wrapper_supplied=1; shift ;;
     --yes|--non-interactive) CA_ASSUME_YES=1 ;; --dry-run) dry_run=1 ;;
     --from-config) from_config="$2"; shift ;;
     -h|--help) usage; exit ;; *) ca_die "Unknown option: $1" ;;
@@ -70,6 +75,7 @@ if [[ -n "$from_config" ]]; then
   ca_load_config "$from_config"
   base_host="$CA_BASE_HOST"; ssh_alias="$CA_SSH_ALIAS"; command_name="$CA_COMMAND_NAME"; endpoint="$CA_ENDPOINT"
   preserve_profile=1
+  [[ "$ssh_wrapper_supplied" == 1 ]] || ssh_wrapper="${CA_SSH_WRAPPER:-auto}"
 fi
 
 [[ "$(id -u)" -ne 0 ]] || ca_die 'Refusing to run as root. This installer is entirely user-local.'
@@ -127,6 +133,8 @@ ca_validate_name "$command_name" || ca_die 'Invalid command name.'
 [[ "$memory" =~ ^[1-9][0-9]*([KMGT])?$ ]] || ca_die 'Memory must look like 8G.'
 [[ "$walltime" =~ ^[0-9]+(-[0-9]+)?(:[0-9]{1,2}){1,2}$ ]] || ca_die 'Invalid Slurm time.'
 [[ "$install_mode" == auto || "$install_mode" == remote || "$install_mode" == upload ]] || ca_die 'Invalid remote install mode.'
+[[ "$ssh_wrapper" == auto || "$ssh_wrapper" == off ]] || ca_die 'SSH wrapper mode must be auto or off.'
+[[ "$command_name" != ssh ]] || ca_die 'The local command cannot be named ssh; that path is reserved for SSH.'
 for dependency in bash ssh scp awk sed tar curl mktemp; do ca_require "$dependency"; done
 ssh -G "$base_host" >/dev/null 2>&1 || ca_die "SSH host '$base_host' cannot be resolved."
 
@@ -155,6 +163,7 @@ else
 fi
 printf '  %-20s %-34s %s\n' 'Codex installation' "$install_mode, user-local" 'Install in your home directory without sudo'
 printf '  %-20s %-34s %s\n' 'Authentication' "$auth_summary" 'Use remote Codex authentication'
+printf '  %-20s %-34s %s\n' 'SSH compatibility' "$ssh_wrapper" 'Manage ~/.local/bin/ssh for apocrita-codex only; preserve unrelated wrappers'
 printf '\nNo sudo command will be run. No SSH password or Codex token will be copied.\n'
 
 if [[ "$dry_run" == 1 ]]; then
@@ -187,10 +196,11 @@ data_root=$(ca_data_dir); config_root=$(ca_config_dir); release_dir="$data_root/
 mkdir -p "$data_root/releases" "$config_root" "$HOME/.local/bin"
 stage="$data_root/releases/.staging.$version.$$"; rm -rf "$stage"; mkdir -p "$stage"
 for item in bin lib completions docs remote profiles README.md LICENSE VERSION install.sh uninstall.sh; do cp -R "$SOURCE_ROOT/$item" "$stage/"; done
-chmod 755 "$stage/install.sh" "$stage/uninstall.sh" "$stage/bin/codex-apocrita" "$stage/remote/"*
+chmod 755 "$stage/install.sh" "$stage/uninstall.sh" "$stage/bin/codex-apocrita" "$stage/bin/codex-apocrita-ssh" "$stage/remote/"*
 rm -rf "$release_dir"; mv "$stage" "$release_dir"
 [[ -L "$data_root/current" ]] && ln -sfn "$(readlink "$data_root/current")" "$data_root/previous"
 ln -sfn "$release_dir" "$data_root/current"
+ca_sync_ssh_wrapper "$ssh_wrapper" "$ssh_alias"
 command_path="$HOME/.local/bin/$command_name"
 if [[ -e "$command_path" || -L "$command_path" ]] &&
    [[ ! -L "$command_path" || "$(readlink "$command_path")" != *codex-apocrita/current/bin/codex-apocrita ]]; then
@@ -204,6 +214,7 @@ BASE_HOST=$base_host
 COMMAND_NAME=$command_name
 ENDPOINT=$endpoint
 SOURCE_DIR=$SOURCE_ROOT
+SSH_WRAPPER=$ssh_wrapper
 EOF
 chmod 600 "$config_root/config"
 
@@ -217,7 +228,7 @@ install_shell_block() {
   cat >> "$file" <<'EOF'
 
 # >>> codex-apocrita >>>
-case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
+case "$PATH" in "$HOME/.local/bin"|"$HOME/.local/bin":*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
 # <<< codex-apocrita <<<
 EOF
   if [[ "$shell_kind" == zsh ]]; then
@@ -260,6 +271,9 @@ fi
 cat <<EOF
 
 Installation complete.
+
+Fully quit and reopen Codex Desktop so it picks up the local SSH fix.
+No Slurm allocation restart is required for this SSH compatibility change.
 
 Open a new terminal (or export PATH="\$HOME/.local/bin:\$PATH"), then run:
   $command_name doctor

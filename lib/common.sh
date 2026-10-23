@@ -29,6 +29,7 @@ ca_load_config() {
       COMMAND_NAME) CA_COMMAND_NAME="$value" ;;
       ENDPOINT) CA_ENDPOINT="$value" ;;
       SOURCE_DIR) CA_SOURCE_DIR="$value" ;;
+      SSH_WRAPPER) CA_SSH_WRAPPER="$value" ;;
       *) ca_warn "Ignoring unknown configuration key: $key" ;;
     esac
   done < "$file"

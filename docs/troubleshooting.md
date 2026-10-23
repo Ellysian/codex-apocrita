@@ -16,37 +16,47 @@ Codex Desktop cannot answer Apocrita's interactive password prompt, so it may re
 
 Some Desktop versions add `ControlPath=none` to the SSH connection used by the
 Desktop tools bridge. This bypasses the authenticated master even when the
-initial connection checks succeed. The optional local shim
+initial connection checks succeed. The managed local shim
 `bin/codex-apocrita-ssh` removes that option only for destination
 `apocrita-codex` when the command launches `app-server proxy`. Every other SSH
 invocation is passed unchanged to `/usr/bin/ssh`; forwarding and authentication
 options are preserved. Other aliases, including custom integration aliases,
 are deliberately unaffected.
 
-On macOS or Linux with `/usr/bin/ssh`, install it from this checkout:
+On macOS or Linux with `/usr/bin/ssh`, update normally:
 
 ```bash
-# First check that this path does not already contain your own SSH wrapper.
-ls -l ~/.local/bin/ssh
-install -m 755 bin/codex-apocrita-ssh ~/.local/bin/ssh
+apo update
 apo ssh force
 ```
 
-The initial `ls` may report that the file does not exist; that is expected.
-Do not overwrite an existing unrelated wrapper. Ensure `~/.local/bin` appears
-before `/usr/bin` in your login-shell PATH, then reconnect Desktop. Restart
-Desktop if it cached the previous SSH executable. The main installer does not
-automatically enable this workaround.
+Then fully quit and reopen Desktop. Since v0.1.1, installation and `apo update`
+automatically enable this fix for the exact `apocrita-codex` alias. The shell
+startup block puts `~/.local/bin` first in PATH. Desktop needs to pick up that
+PATH; simply reconnecting may retain its cached SSH executable.
+
+The installer preserves unrelated files or symlinks at `~/.local/bin/ssh` and
+prints `SSH fix NOT enabled` if one blocks installation. Review that conflict
+before proceeding; do not blindly overwrite your existing wrapper. Recognized,
+unmodified older copies of this project's shim are backed up and migrated to
+a managed symlink. Custom Codex SSH aliases are deliberately not enabled.
 
 This is a local-only workaround: it does not restart or replace the Slurm job,
 change Codex permissions, or edit chat/project state. It deliberately retains
 Desktop's `ControlMaster=no` and reverse-forwarding options; it only allows the
 proxy to reuse the already authenticated socket. A missing or stale master
-still requires `apo ssh force`. After updating this checkout, repeat the
-`install` command above to update a manually installed shim.
+still requires `apo ssh force`. The managed symlink follows integration updates
+automatically; there is no separate wrapper installation step.
 
-To undo it, remove only the installed `~/.local/bin/ssh` shim. The system SSH
-binary, SSH configuration, remote installation, and Codex history are unchanged.
+To opt out, run this from the checkout (adjust the config path if you use XDG_CONFIG_HOME):
+
+```bash
+./install.sh --from-config ~/.config/codex-apocrita/config --ssh-wrapper off --yes --skip-auth
+```
+
+This removes only the managed
+symlink and saves the opt-out for future updates. Uninstall also removes only
+that managed link; unrelated files and timestamped backups are preserved.
 
 ## SSH: disconnected
 

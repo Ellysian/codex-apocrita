@@ -20,12 +20,19 @@ exit 0
 EOF
 ln -s "$XDG_DATA_HOME/codex-apocrita/releases/0.1.0" "$XDG_DATA_HOME/codex-apocrita/current"
 ln -s "$XDG_DATA_HOME/codex-apocrita/releases/0.0.9" "$XDG_DATA_HOME/codex-apocrita/previous"
+mkdir -p "$HOME/.local/bin" "$XDG_DATA_HOME/codex-apocrita/releases/0.1.0/bin"
+cp "$TEST_ROOT/bin/codex-apocrita-ssh" "$XDG_DATA_HOME/codex-apocrita/releases/0.1.0/bin/"
+# An older release may include the optional payload but not lifecycle management.
+mkdir -p "$XDG_DATA_HOME/codex-apocrita/releases/0.0.9/bin"
+cp "$TEST_ROOT/bin/codex-apocrita-ssh" "$XDG_DATA_HOME/codex-apocrita/releases/0.0.9/bin/"
+ln -s "$XDG_DATA_HOME/codex-apocrita/current/bin/codex-apocrita-ssh" "$HOME/.local/bin/ssh"
 bash "$TEST_ROOT/bin/codex-apocrita" update
 assert_contains "$TEST_TMP/update-args" '--from-config'
 assert_contains "$TEST_TMP/update-args" '--skip-auth'
 bash "$TEST_ROOT/bin/codex-apocrita" rollback
 [[ "$(readlink "$XDG_DATA_HOME/codex-apocrita/current")" == *0.0.9 ]] || fail 'local rollback did not swap releases'
 assert_contains "$TEST_TMP/ssh-calls" '--rollback'
+assert_absent "$HOME/.local/bin/ssh"
 
 remote_data="$HOME/.local/share/codex-apocrita"
 mkdir -p "$remote_data/releases/0.1.0" "$remote_data/releases/0.0.9"

@@ -31,6 +31,7 @@ It prints a complete review before changing files. Existing SSH and shell files 
 --time DURATION
 --remote-install-mode auto|remote|upload
 --skip-auth
+--ssh-wrapper auto|off
 --yes | --non-interactive
 --dry-run
 --from-config FILE
@@ -38,6 +39,21 @@ It prints a complete review before changing files. Existing SSH and shell files 
 ```
 
 `--from-config` is used by `apo update`; it preserves the existing remote CPU profile instead of restoring installer defaults.
+
+`--ssh-wrapper auto` (the default, including upgrades from older configurations)
+manages `~/.local/bin/ssh` for the exact `apocrita-codex` alias. This small local
+shim lets Desktop's app-server proxy reuse the authenticated SSH master; other
+destinations and nonmatching requests are passed unchanged to `/usr/bin/ssh`.
+Unrelated files or symlinks at that path are never replaced, and recognized
+older manual copies are backed up before migration. Conflicts produce a clear
+warning; custom aliases are skipped. Fully quit and reopen Desktop after an
+update so it reloads its SSH executable and PATH.
+
+Use `--ssh-wrapper off` to remove only the managed symlink and persist an
+opt-out for future updates. Uninstall removes the managed link too. Rollback
+to a release predating wrapper lifecycle management removes the link rather
+than leaving an unmanaged or broken SSH command. This wrapper never changes
+remote Codex authentication, histories, or permissions.
 
 Example unattended installation:
 
@@ -83,6 +99,7 @@ Local:
 ~/.config/codex-apocrita/config
 ~/.local/share/codex-apocrita/
 ~/.local/bin/apo
+~/.local/bin/ssh  (managed compatibility symlink, when enabled)
 ```
 
 Remote:

@@ -113,6 +113,12 @@ apo update
 
 This performs a fast-forward source update, installs the new integration atomically, and updates the official remote Codex CLI. Use `apo rollback` to return to the previous integration release.
 
+For the default `apocrita-codex` alias, updates also install the local SSH
+compatibility fix for Desktop's `Permission denied (password)` error. Fully
+quit and reopen Desktop afterward; no separate wrapper installation is needed.
+An unrelated `~/.local/bin/ssh` is preserved with a warning—see
+[troubleshooting](docs/troubleshooting.md#terminal-ssh-works-but-desktops-proxy-still-requests-a-password).
+
 Uninstall:
 
 ```bash

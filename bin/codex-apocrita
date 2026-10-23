@@ -11,6 +11,8 @@ ROOT=$(cd -P "$(dirname "$script")/.." && pwd)
 # shellcheck source-path=SCRIPTDIR
 # shellcheck source=../lib/common.sh
 source "$ROOT/lib/common.sh"
+# shellcheck source=../lib/ssh-wrapper.sh
+source "$ROOT/lib/ssh-wrapper.sh"
 ca_load_config "$(ca_config_dir)/config"
 
 # The remote shell, not the local shell, must expand HOME.
@@ -276,6 +278,12 @@ case "$command" in
     current=$(readlink "$data/current"); previous=$(readlink "$data/previous")
     ln -sfn "$previous" "$data/current"
     ln -sfn "$current" "$data/previous"
+    if [[ -f "$previous/lib/ssh-wrapper.sh" ]]; then
+      ca_sync_ssh_wrapper "${CA_SSH_WRAPPER:-auto}" "$CA_SSH_ALIAS"
+    else
+      # Older uninstallers do not know about this managed link.
+      ca_remove_ssh_wrapper
+    fi
     require_ssh
     remote "$REMOTE_ROOT/install-remote.sh --rollback"
     printf 'Rolled back integration to %s.\n' "$(basename "$previous")"
