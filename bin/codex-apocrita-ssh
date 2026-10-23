@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Optional local compatibility shim; install as ~/.local/bin/ssh.
+# All nonmatching invocations are delegated with their original argv.
+# macOS Bash 3.2 treats empty arrays as unset under nounset.
+set -eo pipefail
+
+real_ssh="${CODEX_APOCRITA_SSH_REAL:-/usr/bin/ssh}"
+original=("$@")
+filtered=()
+destination=''
+removed=0
+
+disabled_control_path() {
+  local option
+  option=$(printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]')
+  # Accept OpenSSH's key=value and key value forms, not malformed keys or
+  # different values that would become "none" if all whitespace were removed.
+  [[ "$option" =~ ^[[:space:]]*controlpath([[:space:]]*=[[:space:]]*|[[:space:]]+)none[[:space:]]*$ ]]
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      [[ $# -ge 2 ]] || exec "$real_ssh" "${original[@]}"
+      if disabled_control_path "$2"; then
+        removed=1
+      else
+        filtered+=("$1" "$2")
+      fi
+      shift 2
+      ;;
+    -o?*)
+      if disabled_control_path "${1#-o}"; then
+        removed=1
+      else
+        filtered+=("$1")
+      fi
+      shift
+      ;;
+    -[bBcDEeFIiJLlmOpQRSWw])
+      [[ $# -ge 2 ]] || exec "$real_ssh" "${original[@]}"
+      filtered+=("$1" "$2"); shift 2
+      ;;
+    -[bBcDEeFIiJLlmOpQRSWw]?*)
+      filtered+=("$1"); shift
+      ;;
+    --)
+      filtered+=("$1"); shift
+      [[ $# -gt 0 ]] || exec "$real_ssh" "${original[@]}"
+      destination="$1"
+      break
+      ;;
+    -[46AaCfGgKkMNnqsTtVvXxYy])
+      filtered+=("$1"); shift
+      ;;
+    -*)
+      # Unknown/combined options: leave the entire invocation untouched.
+      exec "$real_ssh" "${original[@]}"
+      ;;
+    *) destination="$1"; break ;;
+  esac
+done
+
+if [[ "$destination" == apocrita-codex && "$removed" == 1 && "$*" == *' app-server proxy'* ]]; then
+  # Remove only ControlPath=none. The alias supplies the authenticated socket.
+  # Keep ControlMaster=no, reverse forwarding, BatchMode, and every other flag.
+  exec "$real_ssh" "${filtered[@]}" "$@"
+fi
+exec "$real_ssh" "${original[@]}"

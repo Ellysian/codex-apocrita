@@ -12,6 +12,42 @@ apo logs 200
 
 Codex Desktop cannot answer Apocrita's interactive password prompt, so it may report `Permission denied (password)` when no authenticated SSH master is available. Run `apo ssh force` in a terminal, finish authentication there, and reconnect Codex Desktop. Don't put the password in `sshpass`, an `expect` script, or a file.
 
+### Terminal SSH works, but Desktop's proxy still requests a password
+
+Some Desktop versions add `ControlPath=none` to the SSH connection used by the
+Desktop tools bridge. This bypasses the authenticated master even when the
+initial connection checks succeed. The optional local shim
+`bin/codex-apocrita-ssh` removes that option only for destination
+`apocrita-codex` when the command launches `app-server proxy`. Every other SSH
+invocation is passed unchanged to `/usr/bin/ssh`; forwarding and authentication
+options are preserved. Other aliases, including custom integration aliases,
+are deliberately unaffected.
+
+On macOS or Linux with `/usr/bin/ssh`, install it from this checkout:
+
+```bash
+# First check that this path does not already contain your own SSH wrapper.
+ls -l ~/.local/bin/ssh
+install -m 755 bin/codex-apocrita-ssh ~/.local/bin/ssh
+apo ssh force
+```
+
+The initial `ls` may report that the file does not exist; that is expected.
+Do not overwrite an existing unrelated wrapper. Ensure `~/.local/bin` appears
+before `/usr/bin` in your login-shell PATH, then reconnect Desktop. Restart
+Desktop if it cached the previous SSH executable. The main installer does not
+automatically enable this workaround.
+
+This is a local-only workaround: it does not restart or replace the Slurm job,
+change Codex permissions, or edit chat/project state. It deliberately retains
+Desktop's `ControlMaster=no` and reverse-forwarding options; it only allows the
+proxy to reuse the already authenticated socket. A missing or stale master
+still requires `apo ssh force`. After updating this checkout, repeat the
+`install` command above to update a manually installed shim.
+
+To undo it, remove only the installed `~/.local/bin/ssh` shim. The system SSH
+binary, SSH configuration, remote installation, and Codex history are unchanged.
+
 ## SSH: disconnected
 
 Network changes invalidate a ControlMaster TCP connection. Run `apo` again. The job may still be running; `apo` reuses it after the new master is ready.
