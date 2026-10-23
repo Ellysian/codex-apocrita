@@ -4,7 +4,20 @@
 # macOS Bash 3.2 treats empty arrays as unset under nounset.
 set -eo pipefail
 
-real_ssh="${CODEX_APOCRITA_SSH_REAL:-/usr/bin/ssh}"
+real_ssh="${CODEX_APOCRITA_SSH_REAL:-}"
+if [[ -z "$real_ssh" ]]; then
+  record="${XDG_CONFIG_HOME:-$HOME/.config}/codex-apocrita/ssh-executable"
+  if [[ -e "$record" ]]; then
+    IFS= read -r real_ssh < "$record" || real_ssh=''
+  elif [[ ! -L "$0" || "$(readlink "$0")" != */codex-apocrita/current/bin/codex-apocrita-ssh ]]; then
+    # Compatibility for manually installed copies without installer state.
+    real_ssh=/usr/bin/ssh
+  fi
+fi
+if [[ "$real_ssh" != /* || ! -f "$real_ssh" || ! -x "$real_ssh" || "$real_ssh" -ef "$0" ]]; then
+  printf 'codex-apocrita: Saved SSH executable is missing, invalid, or recursive. Re-run install.sh to repair it.\n' >&2
+  exit 127
+fi
 original=("$@")
 filtered=()
 destination=''

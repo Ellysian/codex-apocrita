@@ -89,7 +89,9 @@ stage="$remote_root/releases/.staging.$version.$$"; rm -rf "$stage"; mkdir -p "$
 cp -R "$source_release/remote" "$stage/remote"; cp "$source_release/VERSION" "$stage/VERSION"
 chmod 755 "$stage/remote/"*
 rm -rf "$release_dir"; mv "$stage" "$release_dir"
-if [[ -L "$remote_root/current" ]]; then ln -sfn "$(readlink "$remote_root/current")" "$remote_root/previous"; fi
+if [[ -L "$remote_root/current" && "$(readlink "$remote_root/current")" != "$release_dir" ]]; then
+  ln -sfn "$(readlink "$remote_root/current")" "$remote_root/previous"
+fi
 ln -sfn "$release_dir" "$remote_root/current"
 
 backup_conflict() {

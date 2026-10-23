@@ -43,7 +43,10 @@ It prints a complete review before changing files. Existing SSH and shell files 
 `--ssh-wrapper auto` (the default, including upgrades from older configurations)
 manages `~/.local/bin/ssh` for the exact `apocrita-codex` alias. This small local
 shim lets Desktop's app-server proxy reuse the authenticated SSH master; other
-destinations and nonmatching requests are passed unchanged to `/usr/bin/ssh`.
+destinations and nonmatching requests are passed unchanged to the SSH executable
+already selected in your PATH. That absolute path is saved in the user-local
+`ssh-executable` file, not forced to the system OpenSSH binary. Repeat updates
+retain this selection when the managed shim is first in PATH.
 Unrelated files or symlinks at that path are never replaced, and recognized
 older manual copies are backed up before migration. Conflicts produce a clear
 warning; custom aliases are skipped. Fully quit and reopen Desktop after an
@@ -97,6 +100,7 @@ Local:
 ```text
 ~/.ssh/codex-apocrita.conf
 ~/.config/codex-apocrita/config
+~/.config/codex-apocrita/ssh-executable  (saved SSH path, when wrapper enabled)
 ~/.local/share/codex-apocrita/
 ~/.local/bin/apo
 ~/.local/bin/ssh  (managed compatibility symlink, when enabled)

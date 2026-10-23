@@ -19,11 +19,12 @@ Desktop tools bridge. This bypasses the authenticated master even when the
 initial connection checks succeed. The managed local shim
 `bin/codex-apocrita-ssh` removes that option only for destination
 `apocrita-codex` when the command launches `app-server proxy`. Every other SSH
-invocation is passed unchanged to `/usr/bin/ssh`; forwarding and authentication
+invocation is passed unchanged to the SSH executable selected before the shim
+was installed (including Homebrew OpenSSH); forwarding and authentication
 options are preserved. Other aliases, including custom integration aliases,
 are deliberately unaffected.
 
-On macOS or Linux with `/usr/bin/ssh`, update normally:
+On macOS or Linux, update normally:
 
 ```bash
 apo update
@@ -47,6 +48,14 @@ Desktop's `ControlMaster=no` and reverse-forwarding options; it only allows the
 proxy to reuse the already authenticated socket. A missing or stale master
 still requires `apo ssh force`. The managed symlink follows integration updates
 automatically; there is no separate wrapper installation step.
+
+The selected SSH path is stored as plain text in
+`~/.config/codex-apocrita/ssh-executable` (or the corresponding XDG config
+directory). It is not executed as shell configuration. Repeat updates preserve
+that selection rather than capturing the shim itself. If the saved executable
+is removed or the record becomes invalid, the shim fails with a repair message
+instead of silently switching to a different SSH implementation. Re-run the
+installer with a working SSH executable in PATH to repair the selection.
 
 To opt out, run this from the checkout (adjust the config path if you use XDG_CONFIG_HOME):
 

@@ -72,6 +72,11 @@ apo rollback
 
 Updates are manual. Installations made from a Git checkout retain its path; `apo update` fast-forwards that checkout and reruns the idempotent installer. Both local and remote integrations retain a `previous` symlink for rollback.
 
+Reinstalling the current integration version preserves the distinct previous
+release, so running `apo update` more than once does not discard the rollback
+target. Rollback changes the integration scripts, not the separately installed
+upstream Codex CLI version.
+
 Updates also manage the local SSH compatibility shim for `apocrita-codex`.
 Fully quit and reopen Desktop afterward. Existing unrelated SSH wrappers are
 preserved with a warning; the installer option `--ssh-wrapper off` persists an

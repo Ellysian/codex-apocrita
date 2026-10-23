@@ -51,7 +51,14 @@ run_install > "$TEST_TMP/installed"
 assert_contains "$TEST_TMP/installed" 'Optional: verify the complete Codex Desktop integration'
 assert_contains "$TEST_TMP/installed" 'apo test-prompt'
 assert_contains "$TEST_TMP/installed" '"all_checks_pass":true'
+# Simulate a distinct older release to ensure repeats keep the rollback target.
+older="$XDG_DATA_HOME/codex-apocrita/releases/0.0.8"
+mkdir -p "$older"
+printf 'old payload\n' > "$older/keep"
+ln -s "$older" "$XDG_DATA_HOME/codex-apocrita/previous"
 run_install
+[[ "$(readlink "$XDG_DATA_HOME/codex-apocrita/previous")" == "$older" ]] || fail 'repeat install replaced previous with current'
+assert_contains "$older/keep" 'old payload'
 assert_file "$HOME/.ssh/codex-apocrita.conf"
 assert_contains "$HOME/.ssh/codex-apocrita.conf" 'Host apocrita-codex'
 assert_count 1 'Include ~/.ssh/codex-apocrita.conf' "$HOME/.ssh/config"
@@ -82,8 +89,17 @@ bash "$TEST_ROOT/bin/codex-apocrita" update > "$TEST_TMP/update"
 assert_contains "$TEST_TMP/git.log" 'pull --ff-only'
 [[ -L "$HOME/.local/bin/ssh" ]] || fail 'apo update did not install SSH fix for old config'
 assert_contains "$XDG_CONFIG_HOME/codex-apocrita/config" 'SSH_WRAPPER=auto'
+[[ "$(readlink "$XDG_DATA_HOME/codex-apocrita/previous")" == "$older" ]] || fail 'same-version apo update destroyed rollback target'
+[[ "$(cat "$XDG_CONFIG_HOME/codex-apocrita/ssh-executable")" -ef "$TEST_TMP/bin/ssh" ]] || fail 'installer changed the SSH executable'
 assert_contains "$TEST_TMP/update" 'Fully quit and reopen Codex Desktop'
 assert_count 2 '.config/codex-apocrita/profiles/cpu.conf' "$TEST_TMP/scp.log"
+
+newest=$(readlink "$XDG_DATA_HOME/codex-apocrita/current")
+bash "$TEST_ROOT/bin/codex-apocrita" rollback > "$TEST_TMP/repeat-rollback"
+[[ "$(readlink "$XDG_DATA_HOME/codex-apocrita/current")" == "$older" ]] || fail 'rollback after repeat update did not restore older release'
+assert_contains "$older/keep" 'old payload'
+ln -sfn "$newest" "$XDG_DATA_HOME/codex-apocrita/current"
+ln -sfn "$older" "$XDG_DATA_HOME/codex-apocrita/previous"
 
 bash "$TEST_ROOT/install.sh" --from-config "$XDG_CONFIG_HOME/codex-apocrita/config" \
   --yes --skip-auth --remote-install-mode remote --ssh-wrapper off > "$TEST_TMP/off"

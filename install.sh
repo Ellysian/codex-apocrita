@@ -198,7 +198,9 @@ stage="$data_root/releases/.staging.$version.$$"; rm -rf "$stage"; mkdir -p "$st
 for item in bin lib completions docs remote profiles README.md LICENSE VERSION install.sh uninstall.sh; do cp -R "$SOURCE_ROOT/$item" "$stage/"; done
 chmod 755 "$stage/install.sh" "$stage/uninstall.sh" "$stage/bin/codex-apocrita" "$stage/bin/codex-apocrita-ssh" "$stage/remote/"*
 rm -rf "$release_dir"; mv "$stage" "$release_dir"
-[[ -L "$data_root/current" ]] && ln -sfn "$(readlink "$data_root/current")" "$data_root/previous"
+if [[ -L "$data_root/current" && "$(readlink "$data_root/current")" != "$release_dir" ]]; then
+  ln -sfn "$(readlink "$data_root/current")" "$data_root/previous"
+fi
 ln -sfn "$release_dir" "$data_root/current"
 ca_sync_ssh_wrapper "$ssh_wrapper" "$ssh_alias"
 command_path="$HOME/.local/bin/$command_name"
